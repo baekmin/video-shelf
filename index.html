@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<!-- 홈 화면 아이콘이 '독립 실행 앱'이 아니라 사파리에서 열리도록 apple-mobile-web-app-capable을 넣지 않음:
+     독립 실행 앱은 사파리와 쿠키가 분리돼 유튜브 로그인(프리미엄 광고 제거)이 적용되지 않는다. -->
 <meta name="apple-mobile-web-app-title" content="영상 책장">
+<link rel="apple-touch-icon" href="icon.png">
 <meta name="theme-color" content="#ffffff">
 <title>영상 책장</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -256,7 +256,7 @@ var DEFAULTS = {
   version: 1,
   pin: null,
   settings: { appName:'영상 책장', apiKey:'', minSeconds:180, dailyMinutes:60,
-              bedtime:{enabled:true, start:'21:00', end:'07:00'}, syncHours:6, perChannel:30, configVersion:0 },
+              bedtime:{enabled:true, start:'21:00', end:'07:00'}, syncHours:6, perChannel:30, useLogin:true, configVersion:0 },
   categories: [],   // {id, name}
   channels: [],     // {id, title, thumb, handle, subs, catIds:[], useLF, addedAt}
   cache: {},        // channelId -> {syncedAt, videos:[{id,title,dur,pub}]}
@@ -432,7 +432,10 @@ function mountPlayer(v){
   if (/^https?:/.test(location.origin)) vars.origin = location.origin;
   try {
     player = new YT.Player('yt', {
-      host: 'https://www.youtube-nocookie.com', videoId: v.id, width: '100%', height: '100%', playerVars: vars,
+      // youtube.com: 브라우저에 로그인된 유튜브 계정이 적용됨(프리미엄이면 광고 없음, 시청 기록 남음)
+      // youtube-nocookie.com: 로그인 무시(광고 있음, 기록 안 남음)
+      host: S.settings.useLogin === false ? 'https://www.youtube-nocookie.com' : 'https://www.youtube.com',
+      videoId: v.id, width: '100%', height: '100%', playerVars: vars,
       events: {
         onReady: function(e){ try { e.target.playVideo(); } catch (_) {} },
         onStateChange: onPlayerState,
@@ -576,6 +579,10 @@ function renderSettingsTab(){
     '<div class="field"><label for="f-daily">하루 시청 시간 (분)</label><input type="number" id="f-daily" min="0" step="5" value="' + st.dailyMinutes + '"><div class="hint">0이면 제한 없음</div></div></div>' +
     '<label class="check"><input type="checkbox" id="f-bt" ' + (st.bedtime.enabled ? 'checked' : '') + '> 쉬는 시간(취침) 잠금</label>' +
     '<div class="row"><div class="field"><label for="f-bt-s">잠금 시작</label><input type="time" id="f-bt-s" value="' + esc(st.bedtime.start) + '"></div><div class="field"><label for="f-bt-e">잠금 해제</label><input type="time" id="f-bt-e" value="' + esc(st.bedtime.end) + '"></div></div>' +
+    '</div>' +
+    '<div class="sec"><h3>재생 계정</h3>' +
+    '<label class="check"><input type="checkbox" id="f-login" ' + (st.useLogin !== false ? 'checked' : '') + '> 이 브라우저에 로그인된 유튜브 계정으로 재생</label>' +
+    '<div class="hint">켜면 프리미엄 계정일 때 광고가 안 나오고, 본 영상이 그 계정의 시청 기록에 남아요. 끄면 로그인과 무관하게 재생(광고 있음, 기록 안 남음). 사파리에선 설정 → Safari → 개인정보 보호 및 보안 → \'크로스 사이트 추적 방지\'를 꺼야 로그인이 플레이어에 전달돼요.</div>' +
     '</div>' +
     '<div class="sec"><h3>영상 가져오기</h3><div class="row">' +
     '<div class="field"><label for="f-sync">자동 갱신 주기 (시간)</label><input type="number" id="f-sync" min="1" step="1" value="' + st.syncHours + '"></div>' +
@@ -799,6 +806,7 @@ var actions = {
     st.bedtime = { enabled: $('#f-bt').checked, start: $('#f-bt-s').value || '21:00', end: $('#f-bt-e').value || '07:00' };
     st.syncHours = Math.max(1, Math.round(+$('#f-sync').value || 6));
     st.perChannel = Math.min(50, Math.max(5, Math.round(+$('#f-per').value || 30)));
+    st.useLogin = $('#f-login').checked;
     save(); renderBrand(); toast('저장했어요');
     if (st.apiKey && (st.minSeconds !== prevMin || st.perChannel !== prevPer)) syncAll(true);
   },
